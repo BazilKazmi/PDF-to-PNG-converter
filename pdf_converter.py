@@ -17,81 +17,132 @@ class PDFConverterApp(TkDnDApp):
         super().__init__()
 
         self.title("Texture Processor & PDF Converter")
-        self.geometry("650x720") # Made slightly taller for the new slider
+        self.geometry("1000x650") 
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("blue")
+        self.minsize(900, 600)
 
         self.selected_paths = []
 
-        # --- Title ---
-        self.label = ctk.CTkLabel(self, text="Texture Processor & PDF Converter", font=("Arial", 20, "bold"))
-        self.label.pack(pady=15)
+        # ==================== MAIN LAYOUT ====================
+        self.grid_columnconfigure(1, weight=1)
+        self.grid_rowconfigure(0, weight=1)
 
-        # --- Settings Panel ---
-        self.settings_frame = ctk.CTkFrame(self, corner_radius=10)
-        self.settings_frame.pack(pady=5, padx=20, fill="x")
-        
-        self.settings_label = ctk.CTkLabel(self.settings_frame, text="Processing & Render Settings", font=("Arial", 14, "bold"))
-        self.settings_label.pack(pady=5)
+        # ==================== LEFT SIDEBAR (SETTINGS) ====================
+        self.sidebar_frame = ctk.CTkFrame(self, width=320, corner_radius=0)
+        self.sidebar_frame.grid(row=0, column=0, sticky="nsew")
+        self.sidebar_frame.pack_propagate(False) # Keep sidebar width fixed
 
-        # 1. Image Toggles
+        # App Title
+        self.logo_label = ctk.CTkLabel(self.sidebar_frame, text="Texture\nProcessor", 
+                                       font=ctk.CTkFont(family="Segoe UI", size=26, weight="bold"), justify="left")
+        self.logo_label.pack(pady=(30, 20), padx=20, anchor="w")
+
+        # --- Section 1: Output Geometry ---
+        self.lbl_geo = ctk.CTkLabel(self.sidebar_frame, text="OUTPUT GEOMETRY", font=ctk.CTkFont(size=11, weight="bold"), text_color="gray50")
+        self.lbl_geo.pack(anchor="w", padx=20, pady=(10, 0))
+
+        self.square_var = ctk.BooleanVar(value=False)
+        self.chk_square = ctk.CTkCheckBox(self.sidebar_frame, text="Force 1:1 Square Canvas", variable=self.square_var)
+        self.chk_square.pack(anchor="w", padx=20, pady=10)
+
+        self.res_var = ctk.StringVar(value="Match Original")
+        self.res_menu = ctk.CTkOptionMenu(self.sidebar_frame, variable=self.res_var, values=["Match Original", "1024x1024", "2048x2048", "4096x4096"], width=280)
+        self.res_menu.pack(padx=20, pady=(0, 15))
+
+        # --- Section 2: Color & Alpha ---
+        self.lbl_color = ctk.CTkLabel(self.sidebar_frame, text="COLOR & ALPHA", font=ctk.CTkFont(size=11, weight="bold"), text_color="gray50")
+        self.lbl_color.pack(anchor="w", padx=20, pady=(10, 0))
+
         self.remove_bg_var = ctk.BooleanVar(value=False)
+        self.chk_bg = ctk.CTkCheckBox(self.sidebar_frame, text="Force Remove White BG", variable=self.remove_bg_var)
+        self.chk_bg.pack(anchor="w", padx=20, pady=(10, 5))
+
         self.invert_var = ctk.BooleanVar(value=False)
-
-        self.chk_bg = ctk.CTkCheckBox(self.settings_frame, text="Force Remove White BG (Use only if PDF lacks native alpha)", variable=self.remove_bg_var)
-        self.chk_bg.pack(anchor="w", padx=20, pady=5)
-
-        self.chk_invert = ctk.CTkCheckBox(self.settings_frame, text="Invert Colors (Great for Roughness/Bump Maps)", variable=self.invert_var)
+        self.chk_invert = ctk.CTkCheckBox(self.sidebar_frame, text="Invert Colors (Bump/Roughness)", variable=self.invert_var)
         self.chk_invert.pack(anchor="w", padx=20, pady=5)
 
-        # 2. Saturation Slider
-        self.sat_label = ctk.CTkLabel(self.settings_frame, text="Saturation: 1.0 (Normal)")
-        self.sat_label.pack(anchor="w", padx=20, pady=(5, 0))
+        self.sat_label = ctk.CTkLabel(self.sidebar_frame, text="Saturation: 1.0", font=ctk.CTkFont(size=12))
+        self.sat_label.pack(anchor="w", padx=20, pady=(10, 0))
         
-        self.sat_slider = ctk.CTkSlider(self.settings_frame, from_=0, to=3, number_of_steps=30, command=self.update_sat_label)
+        self.sat_slider = ctk.CTkSlider(self.sidebar_frame, from_=0, to=3, number_of_steps=30, command=self.update_sat_label)
         self.sat_slider.set(1.0)
-        self.sat_slider.pack(fill="x", padx=20, pady=(0, 5))
+        self.sat_slider.pack(fill="x", padx=20, pady=(0, 15))
 
-        # 3. Quality / Zoom Slider (NEW)
-        self.zoom_label = ctk.CTkLabel(self.settings_frame, text="PDF Render Quality (Zoom): 4.0")
-        self.zoom_label.pack(anchor="w", padx=20, pady=(5, 0))
+        # --- Section 3: PDF Engine ---
+        self.lbl_pdf = ctk.CTkLabel(self.sidebar_frame, text="PDF RENDER ENGINE", font=ctk.CTkFont(size=11, weight="bold"), text_color="gray50")
+        self.lbl_pdf.pack(anchor="w", padx=20, pady=(10, 0))
+
+        self.zoom_label = ctk.CTkLabel(self.sidebar_frame, text="Render Zoom (Quality): 4.0", font=ctk.CTkFont(size=12))
+        self.zoom_label.pack(anchor="w", padx=20, pady=(10, 0))
         
-        # Ranges from 1 to 10. Step counts allow for smooth half-steps.
-        self.zoom_slider = ctk.CTkSlider(self.settings_frame, from_=1, to=10, number_of_steps=18, command=self.update_zoom_label)
+        self.zoom_slider = ctk.CTkSlider(self.sidebar_frame, from_=1, to=10, number_of_steps=18, command=self.update_zoom_label)
         self.zoom_slider.set(4.0)
-        self.zoom_slider.pack(fill="x", padx=20, pady=(0, 15))
+        self.zoom_slider.pack(fill="x", padx=20, pady=(0, 20))
 
-        # --- Drop Zone Frame ---
-        self.drop_frame = ctk.CTkFrame(self, height=100, corner_radius=15)
-        self.drop_frame.pack(pady=10, padx=20, fill="x")
+        # ==================== RIGHT WORKSPACE ====================
+        self.main_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.main_frame.grid(row=0, column=1, sticky="nsew", padx=30, pady=30)
+        self.main_frame.grid_columnconfigure(0, weight=1)
+        self.main_frame.grid_rowconfigure(2, weight=1) # File list expands
+
+        # --- Big Drop Zone ---
+        self.drop_frame = ctk.CTkFrame(self.main_frame, height=200, corner_radius=15, fg_color=("gray80", "gray15"), border_width=2, border_color="gray30")
+        self.drop_frame.grid(row=0, column=0, sticky="ew", pady=(0, 20))
         self.drop_frame.pack_propagate(False)
 
-        self.drop_label = ctk.CTkLabel(self.drop_frame, text="Drag & Drop PDFs or Images here\nor", text_color="gray")
-        self.drop_label.pack(pady=(15, 5))
+        self.drop_icon = ctk.CTkLabel(self.drop_frame, text="📥", font=ctk.CTkFont(size=40))
+        self.drop_icon.pack(pady=(40, 0))
 
-        self.select_btn = ctk.CTkButton(self.drop_frame, text="Browse Files", command=self.select_files)
+        self.drop_label = ctk.CTkLabel(self.drop_frame, text="Drag & Drop PDFs or Images here", font=ctk.CTkFont(size=16, weight="bold"))
+        self.drop_label.pack(pady=(5, 5))
+
+        self.select_btn = ctk.CTkButton(self.drop_frame, text="Or Browse Files", fg_color="transparent", border_width=1, text_color=("gray10", "gray90"), hover_color=("gray70", "gray25"), command=self.select_files)
         self.select_btn.pack(pady=5)
 
+        # Register entire main area for Drag & Drop
         self.drop_frame.drop_target_register(DND_FILES)
         self.drop_frame.dnd_bind('<<Drop>>', self.handle_drop)
+        self.main_frame.drop_target_register(DND_FILES)
+        self.main_frame.dnd_bind('<<Drop>>', self.handle_drop)
 
-        # --- File List & Execution ---
-        self.file_list_frame = ctk.CTkScrollableFrame(self, height=80)
-        self.file_list_frame.pack(pady=5, padx=20, fill="both", expand=True)
+        # --- Queue Header ---
+        self.queue_header = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        self.queue_header.grid(row=1, column=0, sticky="ew")
+        
+        self.queue_label = ctk.CTkLabel(self.queue_header, text="Processing Queue", font=ctk.CTkFont(size=16, weight="bold"))
+        self.queue_label.pack(side="left")
 
-        self.process_btn = ctk.CTkButton(self, text="Process Files", state="disabled", 
-                                          fg_color="green", hover_color="darkgreen", command=self.process_files)
-        self.process_btn.pack(pady=10)
+        self.clear_btn = ctk.CTkButton(self.queue_header, text="Clear Queue", width=100, fg_color="transparent", text_color="#ff5555", hover_color="#442222", command=self.clear_queue)
+        self.clear_btn.pack(side="right")
 
-        self.progress = ctk.CTkProgressBar(self)
+        # --- File List ---
+        self.file_list_frame = ctk.CTkScrollableFrame(self.main_frame, corner_radius=10, fg_color=("gray85", "gray10"))
+        self.file_list_frame.grid(row=2, column=0, sticky="nsew", pady=(10, 20))
+
+        # --- Execution Area ---
+        self.exec_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        self.exec_frame.grid(row=3, column=0, sticky="ew")
+
+        self.progress = ctk.CTkProgressBar(self.exec_frame, height=12)
         self.progress.set(0)
-        self.progress.pack(pady=10, padx=20, fill="x")
+        self.progress.pack(side="left", fill="x", expand=True, padx=(0, 20))
 
+        self.process_btn = ctk.CTkButton(self.exec_frame, text="PROCESS FILES", state="disabled", font=ctk.CTkFont(weight="bold"), fg_color="#2b8a3e", hover_color="#206a2e", height=40, command=self.process_files)
+        self.process_btn.pack(side="right")
+
+    # ==================== LOGIC FUNCTIONS ====================
     def update_sat_label(self, value):
-        self.sat_label.configure(text=f"Saturation: {value:.1f} (0=Grayscale)")
+        self.sat_label.configure(text=f"Saturation: {value:.1f}")
 
     def update_zoom_label(self, value):
-        self.zoom_label.configure(text=f"PDF Render Quality (Zoom): {value:.1f}")
+        self.zoom_label.configure(text=f"Render Zoom (Quality): {value:.1f}")
+
+    def clear_queue(self):
+        self.selected_paths.clear()
+        for widget in self.file_list_frame.winfo_children():
+            widget.destroy()
+        self.process_btn.configure(state="disabled")
 
     def handle_drop(self, event):
         paths = re.findall(r'\{.*?\}|\S+', event.data)
@@ -108,8 +159,14 @@ class PDFConverterApp(TkDnDApp):
         for f in files:
             if f not in self.selected_paths:
                 self.selected_paths.append(f)
-                lbl = ctk.CTkLabel(self.file_list_frame, text=os.path.basename(f), anchor="w")
-                lbl.pack(fill="x", padx=5, pady=2)
+                
+                # Create a nice looking row for each file
+                file_row = ctk.CTkFrame(self.file_list_frame, fg_color="transparent")
+                file_row.pack(fill="x", padx=5, pady=4)
+                
+                icon = "📄" if f.lower().endswith(".pdf") else "🖼️"
+                lbl = ctk.CTkLabel(file_row, text=f"{icon}  {os.path.basename(f)}", anchor="w", font=ctk.CTkFont(size=13))
+                lbl.pack(side="left", fill="x", expand=True)
         
         if self.selected_paths:
             self.process_btn.configure(state="normal")
@@ -129,10 +186,25 @@ class PDFConverterApp(TkDnDApp):
         if self.remove_bg_var.get():
             img_array = np.array(img)
             r, g, b = img_array[:, :, 0], img_array[:, :, 1], img_array[:, :, 2]
-            # Slightly more aggressive threshold to help eat away white fringing on standard images
             white_mask = (r > 230) & (g > 230) & (b > 230)
             img_array[white_mask, 3] = 0
             img = Image.fromarray(img_array)
+
+        if self.square_var.get():
+            max_dim = max(img.width, img.height)
+            square_img = Image.new("RGBA", (max_dim, max_dim), (0, 0, 0, 0))
+            paste_x = (max_dim - img.width) // 2
+            paste_y = (max_dim - img.height) // 2
+            square_img.paste(img, (paste_x, paste_y))
+            img = square_img
+
+        res_choice = self.res_var.get()
+        if res_choice != "Match Original":
+            target_size = int(res_choice.split("x")[0])
+            if self.square_var.get():
+                img = img.resize((target_size, target_size), Image.Resampling.LANCZOS)
+            else:
+                img.thumbnail((target_size, target_size), Image.Resampling.LANCZOS)
 
         return img
 
@@ -141,9 +213,12 @@ class PDFConverterApp(TkDnDApp):
         if not output_folder:
             return
 
+        self.process_btn.configure(state="disabled", text="PROCESSING...")
+        self.update_idletasks()
+
         try:
             total_files = len(self.selected_paths)
-            zoom_level = self.zoom_slider.get() # Get the current slider value
+            zoom_level = self.zoom_slider.get()
 
             for file_index, file_path in enumerate(self.selected_paths):
                 base_name = os.path.splitext(os.path.basename(file_path))[0]
@@ -152,7 +227,6 @@ class PDFConverterApp(TkDnDApp):
                 if ext == '.pdf':
                     doc = fitz.open(file_path)
                     for i, page in enumerate(doc):
-                        # Apply the dynamic zoom level and strictly enforce Alpha channel
                         mat = fitz.Matrix(zoom_level, zoom_level)
                         pix = page.get_pixmap(matrix=mat, alpha=True) 
                         img = Image.frombytes("RGBA", [pix.width, pix.height], pix.samples)
@@ -169,15 +243,15 @@ class PDFConverterApp(TkDnDApp):
                 self.update_idletasks()
 
             messagebox.showinfo("Success", f"Successfully processed {total_files} file(s)!")
-            
+            self.clear_queue()
             self.progress.set(0)
-            self.selected_paths.clear()
-            for widget in self.file_list_frame.winfo_children():
-                widget.destroy()
-            self.process_btn.configure(state="disabled")
 
         except Exception as e:
             messagebox.showerror("Error", f"Failed to process: {str(e)}")
+        finally:
+            self.process_btn.configure(text="PROCESS FILES")
+            if self.selected_paths:
+                self.process_btn.configure(state="normal")
 
 if __name__ == "__main__":
     app = PDFConverterApp()
